@@ -26,7 +26,7 @@ with col1:
     gross_annual = st.number_input(
         "Gross Annual Salary (₦)",
         min_value=0,
-        value=2_985_762,
+        value=0,
         step=100_000,
         help="Your total yearly salary before deductions"
     )
@@ -78,8 +78,46 @@ nhf = gross_monthly * 0.025
 
 # Simplified PAYE (Progressive tax approximated for mid-income earners)
 # This is a realistic effective rate for ~₦2.5M–₦4M annual income
-paye_rate = 0.12  # ~12% effective after reliefs
-paye = gross_monthly * paye_rate
+# --- Accurate Nigerian Tax Calculation ---
+def calculate_nigeria_tax(gross_annual):
+    cra = max(200_000, 0.21 * gross_annual)
+    taxable = max(0, gross_annual - cra)
+    tax = 0
+    remaining = taxable
+    brackets = [(300_000, 0.07), (300_000, 0.11), (500_000, 0.15),
+                (500_000, 0.19), (1_600_000, 0.21), (float('inf'), 0.24)]
+    for limit, rate in brackets:
+        if remaining <= 0:
+            break
+        chargeable = min(remaining, limit)
+        tax += chargeable * rate
+        remaining -= limit
+    effective_rate = (tax / gross_annual) * 100 if gross_annual > 0 else 0
+    return {'paye_annual': tax, 'effective_tax_rate': effective_rate}
+
+# Use it
+tax_details = calculate_nigeria_tax(gross_annual)
+paye_annual = tax_details['paye_annual']
+paye = paye_annual / 12  # monthly
+
+# Keep pension & NHF as before
+pension = gross_monthly * 0.08
+nhf = gross_monthly * 0.025
+net_after_statutory = gross_monthly - (pension + nhf + paye)
+# Example usage:
+if __name__ == "__main__":
+    salary = 2_985_762  # Your gross annual salary
+    result = calculate_nigeria_tax(salary)
+    
+    print(f"Gross Annual Salary: ₦{result['gross_annual']:,.2f}")
+    print(f"Consolidated Relief: ₦{result['consolidated_relief']:,.2f}")
+    print(f"Taxable Income: ₦{result['taxable_income']:,.2f}")
+    print(f"Annual PAYE Tax: ₦{result['paye_tax']:,.2f}")
+    print(f"Effective Tax Rate: {result['effective_tax_rate']}%")
+
+# In app.py
+paye_annual = calculate_nigeria_tax(gross_annual)['paye_tax']
+paye = paye_annual / 12  # monthly
 
 total_statutory = pension + nhf + paye
 net_after_statutory = gross_monthly - total_statutory
@@ -120,21 +158,24 @@ col5.metric("Gross Monthly", f"₦{gross_monthly:,.0f}")
 col6.metric("After Tax & Pension", f"₦{net_after_statutory:,.0f}")
 col7.metric("Real Spendable", f"₦{real_spendable:,.0f}")
 
-# Breakdown
 with st.expander("🔍 See Full Breakdown"):
     st.write(f"**Gross Monthly:** ₦{gross_monthly:,.0f}")
-    st.write(f"**Deductions:**")
+    st.write(f"**Statutory Deductions:**")
     st.write(f"  - Pension (8%): ₦{pension:,.0f}")
     st.write(f"  - NHF (2.5%): ₦{nhf:,.0f}")
-    st.write(f"  - PAYE Tax (~12%): ₦{paye:,.0f}")
+    st.write(f"  - PAYE Tax ({tax_details['effective_tax_rate']:.1f}% of gross): ₦{paye:,.0f}")
     st.write(f"**Net After Statutory:** ₦{net_after_statutory:,.0f}")
+    
+    st.write(f"")
     st.write(f"**Monthly Outgoings:**")
     st.write(f"  - Transport: ₦{transport:,.0f}")
     st.write(f"  - Housing: ₦{rent_share:,.0f}")
     st.write(f"  - Family Support: ₦{family_support:,.0f}")
     st.write(f"  - House Upkeep: ₦{house_upkeep:,.0f}")
     st.write(f"**Total Outgoings:** ₦{total_outgoings:,.0f}")
-
+    
+    st.write(f"")
+    st.caption("💡 PAYE calculated using Nigeria’s 2025 progressive tax rates + Consolidated Relief Allowance (CRA).")
 # Warning or encouragement
 if real_spendable < 0:
     st.error("⚠️ Your monthly obligations exceed your take-home pay. Consider adjusting expenses or increasing income.")
