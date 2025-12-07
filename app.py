@@ -98,12 +98,12 @@ goal_amount = st.number_input(
 gross_monthly = gross_annual / 12 if gross_annual > 0 else 0
 
 pension = gross_monthly * 0.08
-nhf = gross_monthly * 0.025
+#nhf = gross_monthly * 0.025
 
 tax_details = calculate_nigeria_tax(gross_annual)
 paye = tax_details['paye_annual'] / 12  # monthly
 
-net_after_statutory = gross_monthly - (pension + nhf + paye)
+net_after_statutory = gross_monthly - (pension  + paye)
 
 # Variable Costs
 if city == "Lagos":
